@@ -269,10 +269,10 @@ a:hover {
   font: inherit;
   font-family: var(--font-mono);
   caret-color: transparent;
-  width: 100%;
   padding: 0;
-  flex: 1;
-  min-width: 0;
+  width: 1ch;
+  max-width: 100%;
+  flex: 0 0 auto;
 }
 
 .caret {

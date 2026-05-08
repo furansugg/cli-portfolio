@@ -142,8 +142,11 @@ function focusInput(): void {
 }
 
 function syncCaret(): void {
-  const hasText = input.value.length > 0;
-  caret.classList.toggle("hidden", hasText);
+  // Size the input to its current content (in `ch` units) so the chunky
+  // block caret rendered after it sits right next to the cursor instead
+  // of floating to the far right edge.
+  const len = Math.max(1, input.value.length + 1);
+  input.style.width = `${len}ch`;
 }
 
 // ----------------------------- RENDER SECTIONS ----------------------------
