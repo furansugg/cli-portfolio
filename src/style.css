@@ -299,11 +299,12 @@ a:hover {
 .banner {
   color: var(--accent);
   white-space: pre;
-  font-size: 12px;
+  font-size: clamp(7px, 1.6vw, 12px);
   line-height: 1.1;
   margin: 0 0 6px;
   text-shadow: 0 0 8px rgba(0, 255, 102, 0.25);
-  overflow-x: auto;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .banner-sub {
@@ -384,9 +385,6 @@ ul.bare li::before {
   }
   .screen {
     max-height: calc(100vh - 42px);
-  }
-  .banner {
-    font-size: 9px;
   }
 }
 
