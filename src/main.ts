@@ -157,8 +157,17 @@ function focusInput(): void {
 }
 
 // ----------------------------- NOW PLAYING --------------------------------
-const NOW_PLAYING_POLL_MS = 30_000;
+// Poll every 15s so track changes show up reasonably quickly. Last.fm's
+// rate limit (5 req/s per IP) is well above this and the response is
+// tiny, so we don't need to be conservative here.
+const NOW_PLAYING_POLL_MS = 15_000;
+// Don't refire for tiny window-focus / input-focus bursts: only refresh
+// on activity if it has been at least this long since the last fetch.
+const NOW_PLAYING_MIN_REFRESH_MS = 5_000;
+
 let nowPlayingTimer: number | null = null;
+let nowPlayingInFlight = false;
+let nowPlayingLastFetched = 0;
 
 function renderNowPlaying(np: NowPlaying): void {
   lastNowPlaying = np;
@@ -178,8 +187,21 @@ function renderNowPlaying(np: NowPlaying): void {
 
 async function pollNowPlaying(): Promise<void> {
   if (!isNowPlayingConfigured()) return;
-  const np = await fetchNowPlaying();
-  renderNowPlaying(np);
+  if (nowPlayingInFlight) return;
+  nowPlayingInFlight = true;
+  try {
+    const np = await fetchNowPlaying();
+    renderNowPlaying(np);
+    nowPlayingLastFetched = Date.now();
+  } finally {
+    nowPlayingInFlight = false;
+  }
+}
+
+function maybeRefreshNowPlaying(): void {
+  if (!isNowPlayingConfigured()) return;
+  if (Date.now() - nowPlayingLastFetched < NOW_PLAYING_MIN_REFRESH_MS) return;
+  pollNowPlaying();
 }
 
 function startNowPlayingPoll(): void {
@@ -187,12 +209,14 @@ function startNowPlayingPoll(): void {
   pollNowPlaying();
   if (nowPlayingTimer !== null) return;
   nowPlayingTimer = window.setInterval(pollNowPlaying, NOW_PLAYING_POLL_MS);
-  // Pause polling while the tab is hidden, refresh immediately when it
-  // comes back so the badge stays in sync.
+  // Refresh whenever the user is clearly back at the page so the badge
+  // catches up to whatever is playing right now (instead of waiting up
+  // to a full poll cycle).
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
-    pollNowPlaying();
+    maybeRefreshNowPlaying();
   });
+  window.addEventListener("focus", maybeRefreshNowPlaying);
 }
 
 function syncCaret(): void {
@@ -640,7 +664,12 @@ input.addEventListener("keydown", (e) => {
 });
 
 input.addEventListener("input", syncCaret);
-input.addEventListener("focus", syncCaret);
+input.addEventListener("focus", () => {
+  syncCaret();
+  // Treat any prompt activity as "the user is interacting now" and
+  // give the now-playing badge a chance to refresh promptly.
+  maybeRefreshNowPlaying();
+});
 // Note: we deliberately do NOT hide the caret on blur. Hiding it caused
 // the blink to stop permanently after a command ran, because the user
 // could lose focus (clicking output, scrolling) without us reliably
