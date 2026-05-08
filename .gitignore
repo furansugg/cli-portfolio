@@ -3,3 +3,8 @@ node_modules/
 .vscode/
 .idea/
 *.log
+dist/
+.vite/
+.env
+.env.local
+.env.*.local

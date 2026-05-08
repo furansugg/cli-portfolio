@@ -1,0 +1,17 @@
+{
+  "name": "cli-portfolio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Command-line styled portfolio website built with Vite + TypeScript.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.10"
+  }
+}
