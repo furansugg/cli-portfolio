@@ -3,6 +3,12 @@
 import "./style.css";
 import { profile, sections, files } from "./data";
 import type { Command, SectionName, Theme } from "./types";
+import {
+  fetchNowPlaying,
+  isConfigured as isNowPlayingConfigured,
+  getUsername as getNowPlayingUsername,
+  type NowPlaying,
+} from "./nowplaying";
 
 const VALID_THEMES: readonly Theme[] = ["green", "amber", "blue", "white"];
 
@@ -18,6 +24,15 @@ const output = $<HTMLElement>("output");
 const promptEl = $<HTMLElement>("prompt");
 const input = $<HTMLInputElement>("cmdInput");
 const caret = $<HTMLElement>("caret");
+const nowplayingEl = $<HTMLElement>("nowplaying");
+const nowplayingLink = $<HTMLAnchorElement>("nowplayingLink");
+const nowplayingArtist = $<HTMLElement>("nowplayingArtist");
+const nowplayingTitle = $<HTMLElement>("nowplayingTitle");
+
+// Last "now playing" snapshot, kept in module scope so the `nowplaying`
+// command can print whatever the badge is currently showing without doing
+// an extra network round-trip.
+let lastNowPlaying: NowPlaying = { isPlaying: false };
 
 // ----------------------------- STATE --------------------------------------
 type State = {
@@ -139,6 +154,45 @@ function isTheme(value: string): value is Theme {
 
 function focusInput(): void {
   input.focus({ preventScroll: true });
+}
+
+// ----------------------------- NOW PLAYING --------------------------------
+const NOW_PLAYING_POLL_MS = 30_000;
+let nowPlayingTimer: number | null = null;
+
+function renderNowPlaying(np: NowPlaying): void {
+  lastNowPlaying = np;
+  if (!np.isPlaying) {
+    nowplayingEl.hidden = true;
+    return;
+  }
+  nowplayingArtist.textContent = np.artist || "unknown artist";
+  nowplayingTitle.textContent = np.title || "unknown track";
+  if (np.url) {
+    nowplayingLink.href = np.url;
+  } else {
+    nowplayingLink.removeAttribute("href");
+  }
+  nowplayingEl.hidden = false;
+}
+
+async function pollNowPlaying(): Promise<void> {
+  if (!isNowPlayingConfigured()) return;
+  const np = await fetchNowPlaying();
+  renderNowPlaying(np);
+}
+
+function startNowPlayingPoll(): void {
+  if (!isNowPlayingConfigured()) return;
+  pollNowPlaying();
+  if (nowPlayingTimer !== null) return;
+  nowPlayingTimer = window.setInterval(pollNowPlaying, NOW_PLAYING_POLL_MS);
+  // Pause polling while the tab is hidden, refresh immediately when it
+  // comes back so the badge stays in sync.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    pollNowPlaying();
+  });
 }
 
 function syncCaret(): void {
@@ -367,12 +421,48 @@ const commands: Record<string, Command> = {
       printLine("There's no escape. Try `clear` instead.", "line-warn");
     },
   },
+  nowplaying: {
+    desc: "what I'm listening to right now (Last.fm)",
+    run: () => {
+      if (!isNowPlayingConfigured()) {
+        printLine(
+          "now-playing widget is not configured for this site.",
+          "line-dim",
+        );
+        return;
+      }
+      // Render whatever the polling background task last saw, then
+      // refresh in the background so the next prompt has fresh data.
+      if (lastNowPlaying.isPlaying) {
+        const safeArtist = escapeHtml(lastNowPlaying.artist || "unknown artist");
+        const safeTitle = escapeHtml(lastNowPlaying.title || "unknown track");
+        const url = lastNowPlaying.url;
+        const link = url
+          ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${safeArtist} — ${safeTitle}</a>`
+          : `${safeArtist} — ${safeTitle}`;
+        printHTML(
+          `<span class="line-accent">♫</span> <span class="line-dim">now playing:</span> ${link}`,
+        );
+      } else {
+        const user = escapeHtml(getNowPlayingUsername());
+        printLine(
+          `not currently scrobbling on Last.fm (${user}). play something on Spotify and try again in ~30s.`,
+          "line-dim",
+        );
+      }
+      pollNowPlaying();
+    },
+  },
 };
 
 // aliases
 commands.quit = commands.exit;
 commands.man = { desc: "manual — same as help", run: commands.help.run };
 commands.cls = { desc: "clear (alias)", run: commands.clear.run };
+commands.np = {
+  desc: "now playing (alias)",
+  run: commands.nowplaying.run,
+};
 
 // ----------------------------- BANNER -------------------------------------
 function printBanner(): void {
@@ -580,6 +670,7 @@ function boot(): void {
   printBanner();
   focusInput();
   syncCaret();
+  startNowPlayingPoll();
 }
 
 boot();

@@ -31,6 +31,15 @@
         aria-live="polite"
       >
         <div id="output"></div>
+        <div class="nowplaying" id="nowplaying" hidden>
+          <span class="np-icon" aria-hidden="true">♫</span>
+          <span class="np-label">now playing:</span>
+          <a class="np-track" id="nowplayingLink" href="#" target="_blank" rel="noopener noreferrer">
+            <span class="np-artist" id="nowplayingArtist"></span>
+            <span class="np-sep">—</span>
+            <span class="np-title" id="nowplayingTitle"></span>
+          </a>
+        </div>
         <div class="prompt-line" id="promptLine">
           <span class="prompt" id="prompt"></span>
           <span class="input-wrap">
