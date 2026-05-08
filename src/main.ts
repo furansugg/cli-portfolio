@@ -147,6 +147,14 @@ function syncCaret(): void {
   // of floating to the far right edge.
   const len = Math.max(1, input.value.length + 1);
   input.style.width = `${len}ch`;
+  caret.classList.remove("hidden");
+  // Re-trigger the blink animation so the caret restarts in the visible
+  // half of the cycle (instead of resuming wherever it happened to be
+  // when the input lost/regained focus).
+  caret.style.animation = "none";
+  // Force layout recompute, then restore the animation.
+  void caret.offsetWidth;
+  caret.style.animation = "";
 }
 
 // ----------------------------- RENDER SECTIONS ----------------------------
@@ -543,7 +551,10 @@ input.addEventListener("keydown", (e) => {
 
 input.addEventListener("input", syncCaret);
 input.addEventListener("focus", syncCaret);
-input.addEventListener("blur", () => caret.classList.add("hidden"));
+// Note: we deliberately do NOT hide the caret on blur. Hiding it caused
+// the blink to stop permanently after a command ran, because the user
+// could lose focus (clicking output, scrolling) without us reliably
+// restoring the caret on the next focus.
 
 screen.addEventListener("click", (e) => {
   if (window.getSelection?.()?.toString()) return;
